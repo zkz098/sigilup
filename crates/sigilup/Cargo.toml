@@ -4,11 +4,18 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+homepage.workspace = true
 repository.workspace = true
+readme.workspace = true
+documentation = "https://docs.rs/sigilup"
 authors.workspace = true
 keywords.workspace = true
 categories.workspace = true
 description = "Post-quantum hybrid (Ed25519 + ML-DSA-65) self-update and artifact signing toolkit with single-pass BLAKE3 + SHA-512 streaming verification"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [lints]
 workspace = true

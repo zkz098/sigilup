@@ -4,11 +4,18 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+homepage.workspace = true
 repository.workspace = true
+readme.workspace = true
+documentation = "https://docs.rs/sigilup-manifest"
 authors.workspace = true
 keywords.workspace = true
 categories.workspace = true
 description = "Self-update manifest schema, SemVer evaluation, URL allowlists, anti-rollback/anti-freeze policy, and key-pinning for sigilup"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [lints]
 workspace = true
