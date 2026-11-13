@@ -1,0 +1,42 @@
+[package]
+name = "sigilup"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Post-quantum hybrid (Ed25519 + ML-DSA-65) self-update and artifact signing toolkit with single-pass BLAKE3 + SHA-512 streaming verification"
+
+[lints]
+workspace = true
+
+[features]
+default = ["std"]
+std = ["sigilup-core/std", "sigilup-manifest/std"]
+sign = ["std", "sigilup-core/sign", "sigilup-manifest/sign"]
+reqwest = ["std", "dep:reqwest", "dep:tokio"]
+self-replace = ["std", "dep:self-replace", "dep:tar", "dep:flate2", "dep:zip"]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sigilup-core = { workspace = true, default-features = false }
+sigilup-manifest = { workspace = true, default-features = false }
+thiserror = { workspace = true }
+
+# Optional async HTTP transport
+reqwest = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+
+# Optional cross-platform portable self-replacement
+flate2 = { workspace = true, optional = true }
+self-replace = { workspace = true, optional = true }
+tar = { workspace = true, optional = true }
+zip = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { version = "1", features = ["macros", "rt", "net"] }

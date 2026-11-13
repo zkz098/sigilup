@@ -1,0 +1,29 @@
+[package]
+name = "sigilup-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Release signing, key-rotation, manifest generation, and guard CLI for sigilup"
+
+[[bin]]
+name = "sigilup"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+clap = { workspace = true }
+semver = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sigilup = { workspace = true, features = ["sign"] }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

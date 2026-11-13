@@ -1,0 +1,30 @@
+[package]
+name = "sigilup-manifest"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Self-update manifest schema, SemVer evaluation, URL allowlists, anti-rollback/anti-freeze policy, and key-pinning for sigilup"
+
+[lints]
+workspace = true
+
+[features]
+default = ["std"]
+std = ["sigilup-core/std"]
+sign = ["sigilup-core/sign"]
+
+[dependencies]
+semver = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sigilup-core = { workspace = true, default-features = false }
+thiserror = { workspace = true }
+url = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

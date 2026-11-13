@@ -1,0 +1,97 @@
+# cargo-warden code quality configuration for sigilup
+
+[dag]
+roots = [
+    "crates/sigilup-core/src",
+    "crates/sigilup-manifest/src",
+    "crates/sigilup/src",
+    "crates/sigilup-cli/src",
+]
+forbid_imports = []
+
+[dag.workspace]
+include_dev_dependencies = false
+check_version_conflicts = false
+
+[[dag.workspace.layers]]
+name = "core"
+crates = ["sigilup-core"]
+allow = []
+deny = ["reqwest", "tokio", "self-replace", "clap"]
+
+[[dag.workspace.layers]]
+name = "manifest"
+crates = ["sigilup-manifest"]
+allow = ["core"]
+deny = ["reqwest", "tokio", "self-replace", "clap"]
+
+[[dag.workspace.layers]]
+name = "facade"
+crates = ["sigilup"]
+allow = ["core", "manifest"]
+deny = ["clap"]
+
+[[dag.workspace.layers]]
+name = "cli"
+crates = ["sigilup-cli"]
+allow = ["facade"]
+
+[ci_parity]
+workflow = ".github/workflows/ci.yml"
+test_patterns = ["cargo test", "nextest"]
+ignore_crates = []
+fanout_crates = []
+
+[complexity]
+max = 25
+paths = ["crates"]
+ignore_tests = true
+ignore = ["target"]
+respect_gitignore = true
+
+[file_length]
+max_lines = 800
+extensions = ["rs"]
+paths = ["crates"]
+ignore = ["target", "tests"]
+mode = "physical"
+respect_gitignore = true
+
+[check]
+fmt = true
+clippy = false
+doc = false
+parallel = true
+warn_unused_suppressions = true
+
+[gate]
+include_checks = true
+parallel = true
+clippy_args = ["--workspace", "--all-targets", "--all-features", "--", "-D", "warnings"]
+doc_args = ["--workspace", "--no-deps", "--all-features"]
+
+[[gate.test_groups]]
+name = "core"
+packages = ["sigilup-core"]
+features = ["sign"]
+
+[[gate.test_groups]]
+name = "manifest"
+packages = ["sigilup-manifest"]
+features = ["sign"]
+
+[[gate.test_groups]]
+name = "facade"
+packages = ["sigilup"]
+features = ["sign", "reqwest", "self-replace"]
+
+[[gate.test_groups]]
+name = "cli"
+packages = ["sigilup-cli"]
+features = []
+
+[[gate.custom_steps]]
+name = "core-no-std"
+program = "cargo"
+args = ["check", "-p", "sigilup-core", "--no-default-features", "--features", "alloc"]
+read_only = true

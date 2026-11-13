@@ -1,0 +1,50 @@
+[package]
+name = "sigilup-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Sans-I/O hybrid Ed25519 + ML-DSA-65 cryptographic envelopes, single-pass hashing, and key-rotation primitives for sigilup"
+
+[lints]
+workspace = true
+
+[features]
+default = ["std"]
+alloc = []
+std = [
+    "alloc",
+    "blake3/std",
+    "ed25519-dalek/std",
+    "serde/std",
+    "serde_json/std",
+    "thiserror/std",
+]
+sign = [
+    "alloc",
+    "dep:argon2",
+    "dep:chacha20",
+    "dep:getrandom",
+    "ml-dsa/getrandom",
+]
+
+[dependencies]
+base64 = { workspace = true }
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+ml-dsa = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+subtle = { workspace = true }
+thiserror = { workspace = true }
+zeroize = { workspace = true }
+
+# Optional signing / encrypted key-storage dependencies (never pulled by verifier-only clients)
+argon2 = { workspace = true, optional = true }
+chacha20 = { workspace = true, optional = true }
+getrandom = { workspace = true, optional = true }

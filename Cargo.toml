@@ -1,0 +1,55 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/sigilup-core",
+    "crates/sigilup-manifest",
+    "crates/sigilup",
+    "crates/sigilup-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/zkz098/sigilup"
+authors = ["zkz098"]
+keywords = ["self-update", "signature", "post-quantum", "ml-dsa", "ed25519"]
+categories = ["cryptography", "authentication", "development-tools"]
+
+[workspace.dependencies]
+sigilup-core = { version = "0.1.0", path = "crates/sigilup-core" }
+sigilup-manifest = { version = "0.1.0", path = "crates/sigilup-manifest" }
+sigilup = { version = "0.1.0", path = "crates/sigilup" }
+
+argon2 = { version = "0.6", default-features = false, features = ["alloc", "zeroize"] }
+base64 = { version = "0.23", default-features = false, features = ["alloc"] }
+blake3 = { version = "1", default-features = false }
+chacha20 = { version = "0.10", default-features = false, features = ["cipher", "xchacha", "zeroize"] }
+clap = { version = "4", features = ["derive", "env"] }
+ed25519-dalek = { version = "2.2", default-features = false, features = ["fast", "zeroize"] }
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+getrandom = { version = "0.4", default-features = false }
+ml-dsa = { version = "0.1.1", default-features = false, features = ["alloc", "zeroize"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream"] }
+self-replace = "1.5"
+semver = { version = "1", features = ["serde"] }
+serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "1", default-features = false, features = ["alloc"] }
+sha2 = { version = "0.11", default-features = false }
+subtle = { version = "2.6", default-features = false }
+tar = "0.4"
+tempfile = "3"
+thiserror = { version = "2", default-features = false }
+tokio = { version = "1", features = ["fs", "io-util"] }
+url = "2"
+zeroize = { version = "1.8", default-features = false, features = ["alloc", "derive"] }
+zip = { version = "9", default-features = false, features = ["deflate"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+unwrap_used = "warn"
+expect_used = "warn"
