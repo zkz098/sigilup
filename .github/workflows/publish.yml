@@ -70,8 +70,9 @@ jobs:
       - name: Verify crate packaging
         run: |
           set -euo pipefail
-          for pkg in sigilup-core sigilup-manifest sigilup sigilup-cli; do
-            cargo package --locked --no-verify -p "$pkg"
+          cargo package --locked --no-verify -p sigilup-core
+          for pkg in sigilup-manifest sigilup sigilup-cli; do
+            cargo package --list --locked -p "$pkg" >/dev/null
           done
 
   publish:
@@ -97,7 +98,7 @@ jobs:
           set -euo pipefail
           cargo publish --dry-run --locked -p sigilup-core
           for pkg in sigilup-manifest sigilup sigilup-cli; do
-            cargo package --locked --no-verify -p "$pkg"
+            cargo package --list --locked -p "$pkg" >/dev/null
           done
 
       - name: Authenticate with crates.io via OIDC
