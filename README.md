@@ -17,7 +17,7 @@ Post-quantum hybrid (**Ed25519 + ML-DSA-65 / NIST FIPS 204**) self-update and ar
 
 ```toml
 [dependencies]
-sigilup = { version = "0.1.1", features = ["reqwest", "self-replace"] }
+sigilup = { version = "0.1.2", features = ["reqwest", "self-replace"] }
 ```
 
 Available feature flags on `sigilup`:
