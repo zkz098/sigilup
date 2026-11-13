@@ -1,0 +1,129 @@
+name: Publish to crates.io
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run packaging & dry-run checks without publishing'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  verify:
+    name: Verify Release Readiness
+    runs-on: ubuntu-latest
+    env:
+      WARDEN_VERSION: "0.2.1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify tag matches workspace version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          tag_version="${GITHUB_REF_NAME#v}"
+          pkg_version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "sigilup-core") | .version')"
+          if [ "$tag_version" != "$pkg_version" ]; then
+            echo "Tag version ($tag_version) does not match workspace version ($pkg_version)" >&2
+            exit 1
+          fi
+          echo "Verified tag v$tag_version matches workspace version"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-warden
+        run: |
+          set -euo pipefail
+          asset="cargo-warden-v${WARDEN_VERSION}-x86_64-unknown-linux-gnu"
+          base="https://github.com/zkz098/cargo-warden/releases/download/v${WARDEN_VERSION}"
+          curl -sSfL -o "$asset.tar.gz" "$base/$asset.tar.gz"
+          curl -sSfL -o SHA256SUMS.txt "$base/SHA256SUMS.txt"
+          grep -F "  $asset.tar.gz" SHA256SUMS.txt | sha256sum -c -
+          tar -xzf "$asset.tar.gz"
+          echo "$PWD/$asset" >> "$GITHUB_PATH"
+
+      - name: Run cargo-warden static checks
+        run: cargo warden check
+
+      - name: Clippy check
+        run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+
+      - name: Run workspace tests
+        run: cargo test --locked --workspace --all-features
+
+      - name: Verify crate packaging
+        run: |
+          set -euo pipefail
+          for pkg in sigilup-core sigilup-manifest sigilup sigilup-cli; do
+            cargo package --locked --no-verify -p "$pkg"
+          done
+
+  publish:
+    name: Publish Crates (OIDC)
+    needs: [verify]
+    runs-on: ubuntu-latest
+    environment: crates-io
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Dry-run publish check
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run
+        run: |
+          set -euo pipefail
+          cargo publish --dry-run --locked -p sigilup-core
+          for pkg in sigilup-manifest sigilup sigilup-cli; do
+            cargo package --locked --no-verify -p "$pkg"
+          done
+
+      - name: Authenticate with crates.io via OIDC
+        if: github.event_name != 'workflow_dispatch' || !inputs.dry_run
+        uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+
+      - name: Publish workspace crates in topological order
+        if: github.event_name != 'workflow_dispatch' || !inputs.dry_run
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: |
+          set -euo pipefail
+          for pkg in sigilup-core sigilup-manifest sigilup sigilup-cli; do
+            echo "::group::Publishing $pkg"
+            attempt=1
+            max_attempts=5
+            until cargo publish --locked -p "$pkg"; do
+              if [ "$attempt" -ge "$max_attempts" ]; then
+                echo "Failed to publish $pkg after $max_attempts attempts" >&2
+                exit 1
+              fi
+              echo "Publish $pkg failed (attempt $attempt/$max_attempts), waiting for crates.io index propagation..."
+              attempt=$((attempt + 1))
+              sleep 15
+            done
+            echo "::endgroup::"
+            sleep 15
+          done
