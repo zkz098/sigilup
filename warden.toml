@@ -38,7 +38,7 @@ allow = ["facade"]
 
 [ci_parity]
 workflow = ".github/workflows/ci.yml"
-test_patterns = ["cargo test", "nextest"]
+test_patterns = ["nextest", "llvm-cov"]
 ignore_crates = []
 fanout_crates = []
 

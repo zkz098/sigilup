@@ -85,6 +85,11 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
@@ -95,5 +100,30 @@ jobs:
         run: cargo check --locked --workspace --all-targets --all-features
 
       # Explicit workspace member list verified by `cargo warden ci-parity`
-      - name: Run unit & integration tests
-        run: cargo test --locked -p sigilup-core -p sigilup-manifest -p sigilup -p sigilup-cli --all-targets --all-features --verbose
+      - name: Run unit & integration tests (nextest)
+        run: cargo nextest run --locked --profile ci -p sigilup-core -p sigilup-manifest -p sigilup -p sigilup-cli --all-targets --all-features
+
+  coverage:
+    name: Code Coverage (llvm-cov + nextest)
+    needs: [style]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Install nextest & cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest,cargo-llvm-cov
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Generate coverage report
+        run: |
+          cargo llvm-cov nextest --locked -p sigilup-core -p sigilup-manifest -p sigilup -p sigilup-cli --all-features --no-fail-fast --lcov --output-path lcov.info
+          cargo llvm-cov report --summary-only

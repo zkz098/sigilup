@@ -1,0 +1,54 @@
+[package]
+name = "sigilup-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+# Kept outside the root workspace (`exclude = ["fuzz"]`) so `cargo warden ci-parity`
+# and stable clippy/test builds do not require nightly + libFuzzer sanitizer flags.
+[dependencies]
+libfuzzer-sys = "0.4"
+serde_json = "1"
+sigilup-core = { path = "../crates/sigilup-core", features = ["sign"] }
+sigilup-manifest = { path = "../crates/sigilup-manifest", features = ["sign"] }
+
+[[bin]]
+name = "envelope_verify"
+path = "fuzz_targets/envelope_verify.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "signed_manifest"
+path = "fuzz_targets/signed_manifest.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "compact_key_and_pin"
+path = "fuzz_targets/compact_key_and_pin.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "url_policy"
+path = "fuzz_targets/url_policy.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pae_and_digest"
+path = "fuzz_targets/pae_and_digest.rs"
+test = false
+doc = false
+bench = false
+
+[profile.release]
+debug = 1

@@ -1,0 +1,11 @@
+# Nextest configuration
+# See: https://nexte.st/book/configuration.html
+
+[profile.default]
+retries = 1
+slow-timeout = { period = "30s", terminate-after = 2 }
+
+[profile.ci]
+retries = 2
+slow-timeout = { period = "30s", terminate-after = 2 }
+fail-fast = false
