@@ -1,4 +1,4 @@
 /target
-Cargo.lock
+fuzz/Cargo.lock
 *.sk.json
 *.key
