@@ -25,4 +25,4 @@ Post-quantum hybrid (**Ed25519 + ML-DSA-65 / NIST FIPS 204**) self-update and ar
 
 ## License
 
-Dual-licensed under `MIT OR Apache-2.0`.
+Licensed under the `MIT` license.

@@ -1,0 +1,46 @@
+# cargo-deny configuration for sigilup
+# Docs: https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+all-features = false
+no-default-features = false
+
+[output]
+feature-depth = 1
+
+[advisories]
+ignore = []
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "CDLA-Permissive-2.0",
+    "MIT-0",
+]
+confidence-threshold = 0.8
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+highlight = "all"
+workspace-default-features = "allow"
+external-default-features = "allow"
+deny = [
+    { crate = "openssl", reason = "sigilup uses pure-Rust rustls instead of OpenSSL" },
+    { crate = "openssl-sys", reason = "sigilup uses pure-Rust rustls instead of OpenSSL" },
+    { crate = "native-tls", reason = "sigilup uses pure-Rust rustls instead of native-tls" },
+    { crate = "scrypt", reason = "sigilup uses Argon2id for key encryption" },
+    { crate = "rpassword", reason = "sigilup avoids TTY-blocking rpassword" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

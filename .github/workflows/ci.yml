@@ -45,6 +45,23 @@ jobs:
       - name: Run cargo-warden static checks
         run: cargo warden check
 
+  deny:
+    name: Supply Chain & License Check (cargo-deny)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+
+      - name: Run cargo-deny
+        run: cargo deny --locked --all-features check
+
   style:
     name: Code Style, Clippy & Docs
     runs-on: ubuntu-latest
