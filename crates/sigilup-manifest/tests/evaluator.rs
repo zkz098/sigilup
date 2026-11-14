@@ -21,6 +21,7 @@ mod signed_tests {
             PlatformAsset {
                 kind: "portable".to_string(),
                 url: "https://github.com/zkz098/demo/releases/download/v2.0.0/demo-linux-x86_64.tar.gz".to_string(),
+                fallback_urls: Vec::new(),
                 digest: ArtifactHasher::hash_bytes(b"portable-tarball-payload"),
                 metadata: None,
             },
@@ -30,6 +31,7 @@ mod signed_tests {
             PlatformAsset {
                 kind: "deb".to_string(),
                 url: "https://github.com/zkz098/demo/releases/download/v2.0.0/demo.deb".to_string(),
+                fallback_urls: Vec::new(),
                 digest: ArtifactHasher::hash_bytes(b"deb-payload"),
                 metadata: None,
             },
@@ -254,5 +256,60 @@ mod signed_tests {
         // PinFile signing guard checks
         assert!(pins.verify_signing_key(&old_release_sk).is_ok());
         assert!(pins.verify_signing_key(&new_release_sk).is_err());
+    }
+
+    #[test]
+    fn validates_fallback_urls_against_url_policy_and_preserves_backward_compat() {
+        let sk = SecretKeyBundle::from_seeds([16u8; 32], [17u8; 32]).unwrap();
+        let pins = KeyPinFile::new(vec![sk.public_key().clone()]);
+
+        // Backward-compat: JSON without `fallbackUrls` deserializes cleanly.
+        let legacy_json = serde_json::json!({
+            "kind": "portable",
+            "url": "https://github.com/zkz098/demo/releases/download/v2.0.0/demo.bin",
+            "digest": ArtifactHasher::hash_bytes(b"abc"),
+        });
+        let legacy_asset: PlatformAsset<()> = serde_json::from_value(legacy_json).unwrap();
+        assert!(legacy_asset.fallback_urls.is_empty());
+
+        let mut manifest = sample_manifest("2.1.0", 6, None);
+        manifest
+            .assets
+            .get_mut("linux-x86_64-portable")
+            .unwrap()
+            .fallback_urls = vec![
+            "https://gh-proxy.com/https://github.com/zkz098/demo/releases/download/v2.0.0/demo-linux-x86_64.tar.gz".to_string(),
+        ];
+        let signed = SignedManifest::sign(&manifest, &sk, 1_780_000_000).unwrap();
+
+        // Policy that only allows github.com rejects the mirror fallback URL.
+        let mut store = MemoryEpochStore::new(0);
+        let mut strict_eval =
+            UpdateEvaluator::new(pins.to_trust_store(), semver::Version::new(1, 0, 0))
+                .with_url_policy(github_url_policy())
+                .with_channel("portable");
+        strict_eval.platform_base = "linux-x86_64".to_string();
+        assert!(matches!(
+            strict_eval.evaluate::<(), _>(&signed, &mut store, VerifyContext::default()),
+            Err(Error::UrlRejected { .. })
+        ));
+
+        // Policy that allows both prefixes accepts it.
+        let mut mirror_eval =
+            UpdateEvaluator::new(pins.to_trust_store(), semver::Version::new(1, 0, 0))
+                .with_url_policy(UrlPolicy::with_prefixes([
+                    "https://github.com/zkz098/demo/releases/",
+                    "https://gh-proxy.com/https://github.com/zkz098/demo/releases/",
+                ]))
+                .with_channel("portable");
+        mirror_eval.platform_base = "linux-x86_64".to_string();
+        assert!(matches!(
+            mirror_eval.evaluate::<(), _>(
+                &signed,
+                &mut MemoryEpochStore::new(0),
+                VerifyContext::default()
+            ),
+            Ok(UpdateDecision::UpdateAvailable(_))
+        ));
     }
 }

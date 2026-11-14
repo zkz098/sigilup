@@ -107,6 +107,33 @@ pub fn install_portable_update(
     Ok(())
 }
 
+/// Build a [`std::process::Command`] targeting [`std::env::current_exe`] with `args`.
+///
+/// Callers can customize working directory, environment variables, or stdio before
+/// spawning, and decide when to exit the old process after spawning.
+pub fn relaunch_command<I, S>(args: I) -> Result<std::process::Command, ReplaceError>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<std::ffi::OsStr>,
+{
+    let exe = std::env::current_exe()?;
+    let mut cmd = std::process::Command::new(exe);
+    cmd.args(args);
+    Ok(cmd)
+}
+
+/// Spawn a new instance of the currently running executable with `args`.
+///
+/// This does **not** terminate the current process; callers should flush state,
+/// release single-instance locks if needed, and exit cleanly afterwards.
+pub fn spawn_relaunch<I, S>(args: I) -> Result<std::process::Child, ReplaceError>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<std::ffi::OsStr>,
+{
+    Ok(relaunch_command(args)?.spawn()?)
+}
+
 fn extract_from_zip(
     archive_path: &Path,
     staging_dir: &Path,

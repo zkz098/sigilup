@@ -45,6 +45,7 @@ tar = "0.4"
 tempfile = "3"
 thiserror = { version = "2", default-features = false }
 tokio = { version = "1", features = ["fs", "io-util"] }
+ureq = { version = "3", default-features = false, features = ["rustls"] }
 url = "2"
 zeroize = { version = "1.8", default-features = false, features = ["alloc", "derive"] }
 zip = { version = "9", default-features = false, features = ["deflate"] }

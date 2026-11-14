@@ -189,6 +189,9 @@ impl UpdateEvaluator {
         }
 
         self.url_policy.validate(&asset.url)?;
+        for fallback in &asset.fallback_urls {
+            self.url_policy.validate(fallback)?;
+        }
 
         Ok(UpdateDecision::UpdateAvailable(Box::new(AvailableUpdate {
             version: manifest.version,

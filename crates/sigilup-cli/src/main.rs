@@ -118,12 +118,22 @@ enum Command {
         /// Optional minimum installed version permitted to auto-update.
         #[arg(long)]
         min_supported_version: Option<String>,
-        /// Input asset map JSON: `{ "linux-x86_64": { "kind": "portable", "path": "...", "url": "..." } }`.
-        #[arg(long)]
-        assets_json: PathBuf,
+        /// Input asset map JSON: `{ "linux-x86_64": { "kind": "portable", "path": "...", "url": "...", "fallbackUrls": [...] } }`.
+        #[arg(long, required_unless_present = "assets")]
+        assets_json: Option<PathBuf>,
+        /// Inline asset specification: `<KEY>=<KIND>:<PATH>:<URL>` (repeatable).
+        #[arg(
+            long = "asset",
+            value_name = "KEY=KIND:PATH:URL",
+            required_unless_present = "assets_json"
+        )]
+        assets: Vec<String>,
         /// Release notes string.
-        #[arg(long, default_value = "")]
+        #[arg(long, default_value = "", conflicts_with = "notes_file")]
         notes: String,
+        /// Path to release notes file (e.g. `RELEASE_NOTES.md`).
+        #[arg(long, conflicts_with = "notes")]
+        notes_file: Option<PathBuf>,
         /// Output path for the signed manifest JSON.
         #[arg(long)]
         out_file: PathBuf,
@@ -182,6 +192,8 @@ struct InputAssetSpec {
     path: PathBuf,
     url: String,
     #[serde(default)]
+    fallback_urls: Vec<String>,
+    #[serde(default)]
     metadata: Option<serde_json::Value>,
 }
 
@@ -235,7 +247,9 @@ fn run() -> Result<()> {
             expires_in_days,
             min_supported_version,
             assets_json,
+            assets,
             notes,
+            notes_file,
             out_file,
             key,
             password,
@@ -244,8 +258,10 @@ fn run() -> Result<()> {
             epoch,
             expires_in_days,
             min_supported_version.as_deref(),
-            &assets_json,
+            assets_json.as_deref(),
+            &assets,
             &notes,
+            notes_file.as_deref(),
             &out_file,
             &key,
             password.as_deref(),
@@ -412,14 +428,67 @@ fn cmd_verify(
     Ok(())
 }
 
+fn parse_asset_arg(raw: &str) -> Result<(String, InputAssetSpec)> {
+    let Some((key, rest)) = raw.split_once('=') else {
+        return Err(CliError::Message(format!(
+            "invalid --asset '{raw}': expected <KEY>=<KIND>:<PATH>:<URL>"
+        )));
+    };
+    if key.is_empty() {
+        return Err(CliError::Message(format!(
+            "invalid --asset '{raw}': empty asset key"
+        )));
+    }
+    let Some((kind, path_and_url)) = rest.split_once(':') else {
+        return Err(CliError::Message(format!(
+            "invalid --asset '{raw}': expected <KEY>=<KIND>:<PATH>:<URL>"
+        )));
+    };
+    if kind.is_empty() {
+        return Err(CliError::Message(format!(
+            "invalid --asset '{raw}': empty asset kind"
+        )));
+    }
+
+    let url_split = path_and_url
+        .find(":https://")
+        .or_else(|| path_and_url.find(":http://"));
+    let Some(split_idx) = url_split else {
+        return Err(CliError::Message(format!(
+            "invalid --asset '{raw}': URL must start with http:// or https://"
+        )));
+    };
+
+    let path = &path_and_url[..split_idx];
+    let url = &path_and_url[split_idx + 1..];
+    if path.is_empty() {
+        return Err(CliError::Message(format!(
+            "invalid --asset '{raw}': empty artifact path"
+        )));
+    }
+
+    Ok((
+        key.to_string(),
+        InputAssetSpec {
+            kind: kind.to_string(),
+            path: PathBuf::from(path),
+            url: url.to_string(),
+            fallback_urls: Vec::new(),
+            metadata: None,
+        },
+    ))
+}
+
 #[allow(clippy::too_many_arguments)]
 fn cmd_manifest(
     version_str: &str,
     epoch: u64,
     expires_in_days: Option<u64>,
     min_supported: Option<&str>,
-    assets_json: &Path,
+    assets_json: Option<&Path>,
+    asset_args: &[String],
     notes: &str,
+    notes_file: Option<&Path>,
     out_file: &Path,
     key_spec: &str,
     password: Option<&str>,
@@ -431,11 +500,29 @@ fn cmd_manifest(
         None => None,
     };
 
-    let raw_assets = fs::read_to_string(assets_json)?;
-    let specs: BTreeMap<String, InputAssetSpec> = serde_json::from_str(&raw_assets)?;
+    let mut specs: BTreeMap<String, InputAssetSpec> = match assets_json {
+        Some(path) => {
+            let raw_assets = fs::read_to_string(path)?;
+            serde_json::from_str(&raw_assets)?
+        }
+        None => BTreeMap::new(),
+    };
+    for raw in asset_args {
+        let (key, spec) = parse_asset_arg(raw)?;
+        if specs.insert(key.clone(), spec).is_some() {
+            return Err(CliError::Message(format!(
+                "duplicate asset key '{key}' in --asset / --assets-json"
+            )));
+        }
+    }
     if specs.is_empty() {
         return Err(CliError::Message("assets map is empty".to_string()));
     }
+
+    let resolved_notes = match notes_file {
+        Some(path) => fs::read_to_string(path)?,
+        None => notes.to_string(),
+    };
 
     let mut assets = BTreeMap::new();
     for (key, spec) in specs {
@@ -446,6 +533,7 @@ fn cmd_manifest(
             PlatformAsset {
                 kind: spec.kind,
                 url: spec.url,
+                fallback_urls: spec.fallback_urls,
                 digest,
                 metadata: spec.metadata,
             },
@@ -462,7 +550,7 @@ fn cmd_manifest(
         min_supported_version,
         published_at: now,
         expires_at,
-        notes: notes.to_string(),
+        notes: resolved_notes,
         assets,
         key_rotations: Vec::new(),
     };
@@ -636,4 +724,37 @@ fn restrict_permissions(path: &Path) -> Result<()> {
 #[cfg(not(unix))]
 fn restrict_permissions(_path: &Path) -> Result<()> {
     Ok(())
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_asset_arg_handles_unix_and_windows_paths() {
+        let (k1, s1) = parse_asset_arg(
+            "linux-x86_64=portable:dist/app.tar.gz:https://github.com/org/repo/releases/download/v1.0.0/app.tar.gz",
+        )
+        .unwrap();
+        assert_eq!(k1, "linux-x86_64");
+        assert_eq!(s1.kind, "portable");
+        assert_eq!(s1.path, PathBuf::from("dist/app.tar.gz"));
+        assert_eq!(
+            s1.url,
+            "https://github.com/org/repo/releases/download/v1.0.0/app.tar.gz"
+        );
+
+        let (k2, s2) =
+            parse_asset_arg(r"windows-x86_64=portable:C:\dist\app.zip:https://example.com/app.zip")
+                .unwrap();
+        assert_eq!(k2, "windows-x86_64");
+        assert_eq!(s2.kind, "portable");
+        assert_eq!(s2.path, PathBuf::from(r"C:\dist\app.zip"));
+        assert_eq!(s2.url, "https://example.com/app.zip");
+
+        assert!(parse_asset_arg("missing-equals").is_err());
+        assert!(parse_asset_arg("k=portable:dist/a.zip:ftp://example.com/a.zip").is_err());
+        assert!(parse_asset_arg("k=portable::https://example.com/a.zip").is_err());
+    }
 }

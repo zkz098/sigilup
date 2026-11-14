@@ -23,11 +23,21 @@ pub struct PlatformAsset<M = serde_json::Value> {
     pub kind: String,
     /// Download URL (validated against [`crate::UrlPolicy`] before fetching).
     pub url: String,
+    /// Optional fallback/mirror download URLs tried in order if [`Self::url`] fails.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fallback_urls: Vec<String>,
     /// Dual digest (`size`, `blake3`, `sha512`) of the exact artifact bytes.
     pub digest: ArtifactDigest,
     /// Optional host-defined metadata (kept extensible across projects).
     #[serde(default = "default_none", skip_serializing_if = "Option::is_none")]
     pub metadata: Option<M>,
+}
+
+impl<M> PlatformAsset<M> {
+    /// Iterate over [`Self::url`] followed by each entry in [`Self::fallback_urls`].
+    pub fn all_urls(&self) -> impl Iterator<Item = &str> {
+        core::iter::once(self.url.as_str()).chain(self.fallback_urls.iter().map(String::as_str))
+    }
 }
 
 /// Self-update release manifest (schema v2).

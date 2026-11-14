@@ -80,4 +80,29 @@ impl VerifyContext {
             min_security_epoch: 0,
         }
     }
+
+    /// Construct a verification context using the current system clock (`SystemTime::now()`).
+    #[cfg(feature = "std")]
+    #[must_use]
+    pub fn now() -> Self {
+        let now_unix = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        Self::at_unix(now_unix)
+    }
+
+    /// Override the minimum acceptable `security_epoch` (anti-rollback floor).
+    #[must_use]
+    pub const fn with_min_security_epoch(mut self, min_security_epoch: u64) -> Self {
+        self.min_security_epoch = min_security_epoch;
+        self
+    }
+
+    /// Override the allowed clock skew in seconds before rejecting an expired manifest.
+    #[must_use]
+    pub const fn with_max_clock_skew_secs(mut self, max_clock_skew_secs: u64) -> Self {
+        self.max_clock_skew_secs = max_clock_skew_secs;
+        self
+    }
 }

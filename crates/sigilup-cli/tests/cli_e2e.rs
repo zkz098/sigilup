@@ -196,3 +196,124 @@ fn cli_full_release_lifecycle_end_to_end() {
         .unwrap();
     assert!(!status.success(), "verify must fail on tampered artifact");
 }
+
+#[test]
+fn cli_manifest_supports_inline_asset_notes_file_and_fallback_urls() {
+    let dir = tempfile::tempdir().unwrap();
+    let keys_dir = dir.path().join("keys");
+    let dist_dir = dir.path().join("dist");
+    fs::create_dir_all(&dist_dir).unwrap();
+
+    let status = Command::new(sigilup_bin())
+        .args([
+            "keygen",
+            "--out-dir",
+            keys_dir.to_str().unwrap(),
+            "--name",
+            "ci",
+            "--unencrypted",
+        ])
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let sk_raw = keys_dir.join("ci.sk.raw");
+    let pins_json = keys_dir.join("sigilup-pins.json");
+
+    let artifact_a = dist_dir.join("app-win.zip");
+    fs::write(&artifact_a, b"windows-zip-bytes").unwrap();
+    let artifact_b = dist_dir.join("app-linux.tar.gz");
+    fs::write(&artifact_b, b"linux-tar-bytes").unwrap();
+
+    let notes_path = dir.path().join("RELEASE_NOTES.md");
+    fs::write(&notes_path, "# Release v1.2.3\n\n- Line 1\n- Line 2\n").unwrap();
+
+    // 1. Inline --asset + --notes-file (no assets.json needed)
+    let inline_manifest = dist_dir.join("inline.hsig.json");
+    let status = Command::new(sigilup_bin())
+        .args([
+            "manifest",
+            "--version",
+            "v1.2.3",
+            "--epoch",
+            "2",
+            "--asset",
+            &format!(
+                "windows-x86_64=portable:{}:https://example.com/app-win.zip",
+                artifact_a.display()
+            ),
+            "--notes-file",
+            notes_path.to_str().unwrap(),
+            "--out-file",
+            inline_manifest.to_str().unwrap(),
+            "--key",
+            sk_raw.to_str().unwrap(),
+        ])
+        .status()
+        .unwrap();
+    assert!(
+        status.success(),
+        "manifest with --asset and --notes-file failed"
+    );
+
+    let pins =
+        sigilup::manifest::KeyPinFile::from_json_str(&fs::read_to_string(&pins_json).unwrap())
+            .unwrap();
+    let mut store = pins.to_trust_store();
+    let signed: sigilup::manifest::SignedManifest =
+        serde_json::from_str(&fs::read_to_string(&inline_manifest).unwrap()).unwrap();
+    let decoded: sigilup::manifest::UpdateManifest<serde_json::Value> = signed
+        .verify_and_decode(&mut store, sigilup::VerificationPolicy::strict(), 2)
+        .unwrap();
+    assert_eq!(decoded.notes, "# Release v1.2.3\n\n- Line 1\n- Line 2\n");
+    assert!(decoded.assets.contains_key("windows-x86_64"));
+
+    // 2. assets.json with fallbackUrls
+    let assets_json = dir.path().join("assets.json");
+    fs::write(
+        &assets_json,
+        serde_json::json!({
+            "linux-x86_64": {
+                "kind": "portable",
+                "path": artifact_b,
+                "url": "https://github.com/org/repo/releases/download/v1.2.3/app-linux.tar.gz",
+                "fallbackUrls": [
+                    "https://gh-proxy.com/https://github.com/org/repo/releases/download/v1.2.3/app-linux.tar.gz"
+                ]
+            }
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let fallback_manifest = dist_dir.join("fallback.hsig.json");
+    let status = Command::new(sigilup_bin())
+        .args([
+            "manifest",
+            "--version",
+            "1.2.3",
+            "--epoch",
+            "2",
+            "--assets-json",
+            assets_json.to_str().unwrap(),
+            "--out-file",
+            fallback_manifest.to_str().unwrap(),
+            "--key",
+            sk_raw.to_str().unwrap(),
+        ])
+        .status()
+        .unwrap();
+    assert!(status.success(), "manifest with fallbackUrls failed");
+
+    let signed2: sigilup::manifest::SignedManifest =
+        serde_json::from_str(&fs::read_to_string(&fallback_manifest).unwrap()).unwrap();
+    let decoded2: sigilup::manifest::UpdateManifest<serde_json::Value> = signed2
+        .verify_and_decode(&mut store, sigilup::VerificationPolicy::strict(), 2)
+        .unwrap();
+    assert_eq!(
+        decoded2.assets["linux-x86_64"].fallback_urls,
+        vec![
+            "https://gh-proxy.com/https://github.com/org/repo/releases/download/v1.2.3/app-linux.tar.gz"
+        ]
+    );
+}

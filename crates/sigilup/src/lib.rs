@@ -5,7 +5,7 @@
 //! - [`manifest`]: Self-contained `SignedManifest`, `UpdateEvaluator` (SemVer + anti-rollback/freeze),
 //!   `UrlPolicy`, and `KeyPinFile`.
 //! - [`stream`]: O(1)-memory single-pass streaming sign/verify helpers.
-//! - `transport` (`feature = "reqwest"`): async 1-RTT manifest check & in-flight verified download.
+//! - `transport` (`feature = "reqwest"` or `feature = "blocking"`): 1-RTT manifest check & in-flight verified download.
 //! - `replace` (`feature = "self-replace"`): cross-platform portable binary replacement.
 
 pub use sigilup_core as core;
@@ -15,8 +15,8 @@ pub use sigilup_manifest as manifest;
 #[cfg(feature = "std")]
 pub mod stream;
 
-/// Async 1-RTT `reqwest` manifest fetcher and in-flight verified downloader.
-#[cfg(feature = "reqwest")]
+/// HTTP manifest fetcher and in-flight verified downloader (`reqwest` async and/or `ureq` blocking).
+#[cfg(any(feature = "reqwest", feature = "blocking"))]
 pub mod transport;
 
 /// Portable binary/archive extraction and atomic `self-replace` installer.
