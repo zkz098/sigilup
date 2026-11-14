@@ -9,7 +9,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.2"
+version = "0.1.3"
 edition = "2024"
 rust-version = "1.87"
 license = "MIT"
@@ -21,9 +21,9 @@ keywords = ["self-update", "signature", "post-quantum", "ml-dsa", "ed25519"]
 categories = ["cryptography", "authentication", "development-tools"]
 
 [workspace.dependencies]
-sigilup-core = { version = "0.1.2", path = "crates/sigilup-core" }
-sigilup-manifest = { version = "0.1.2", path = "crates/sigilup-manifest" }
-sigilup = { version = "0.1.2", path = "crates/sigilup" }
+sigilup-core = { version = "0.1.3", path = "crates/sigilup-core" }
+sigilup-manifest = { version = "0.1.3", path = "crates/sigilup-manifest" }
+sigilup = { version = "0.1.3", path = "crates/sigilup" }
 
 argon2 = { version = "0.6", default-features = false, features = ["alloc", "zeroize"] }
 base64 = { version = "0.23", default-features = false, features = ["alloc"] }
